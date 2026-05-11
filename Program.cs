@@ -45,8 +45,14 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Root "/" → Account/Login; all other single-segment URLs use Index as default action
+app.MapControllerRoute(
+    name: "root",
+    pattern: "",
+    defaults: new { controller = "Account", action = "Login" });
+
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Account}/{action=Login}/{id?}");
+    pattern: "{controller}/{action=Index}/{id?}");
 
 app.Run();
