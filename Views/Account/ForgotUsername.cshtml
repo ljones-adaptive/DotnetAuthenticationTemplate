@@ -1,0 +1,26 @@
+@model ScalpingApp.ViewModels.ForgotEmailViewModel
+@{ ViewData["Title"] = "Forgotten Username"; Layout = "_Layout"; }
+<div class="page-center">
+  <div style="width:100%;max-width:400px">
+    <div class="card">
+      <h2 style="font-size:1.1rem;font-weight:600;margin-bottom:0.5rem">Forgotten Username</h2>
+      <p class="text-muted" style="font-size:0.875rem;margin-bottom:1.5rem">Enter your email and we will send you your username.</p>
+      @if (Model.Sent)
+      {
+        <div class="alert alert-success">If that email exists, your username has been sent.</div>
+        <p class="text-center mt2"><a href="/Account/Login">Back to login</a></p>
+      }
+      else
+      {
+        <form method="post">
+          <div class="form-group">
+            <label>Email Address</label>
+            <input asp-for="Email" type="email" required />
+          </div>
+          <button class="btn btn-primary btn-full mt2" type="submit">Send Username</button>
+        </form>
+        <p class="text-center mt2 text-muted" style="font-size:0.875rem"><a href="/Account/Login">Back to login</a></p>
+      }
+    </div>
+  </div>
+</div>

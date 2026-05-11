@@ -1,0 +1,23 @@
+## .NET
+bin/
+obj/
+publish/
+*.user
+.vs/
+*.suo
+
+## Static library packages (restored by NuGet)
+wwwroot/lib/
+
+## Production config — never commit real credentials
+appsettings.Production.json
+appsettings.Development.json
+
+## Database
+*.db
+*.db-shm
+*.db-wal
+
+## OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,69 @@
+@model ScalpingApp.ViewModels.ProfileViewModel
+@{ ViewData["Title"] = "Profile"; Layout = "_Layout"; }
+@await Html.PartialAsync("_Topbar")
+
+<div style="padding:2rem;max-width:640px;margin:0 auto">
+
+  <div class="card" style="margin-bottom:1.5rem">
+    <div style="display:flex;align-items:center;gap:1rem">
+      <div style="width:56px;height:56px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:1.4rem;font-weight:700;color:#0a0e1a;flex-shrink:0">
+        @Model.Username[0].ToString().ToUpper()
+      </div>
+      <div>
+        <div style="font-size:1.1rem;font-weight:600">@Model.Username</div>
+        <div style="margin-top:0.25rem">
+          <span style="background:var(--border);padding:0.25rem 0.75rem;border-radius:999px;font-size:0.75rem;color:var(--accent);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">
+            @Model.Role
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:1.5rem">
+    <div class="card-title">Change Email</div>
+    @if (Model.EmailError != null) { <div class="alert alert-error">@Model.EmailError</div> }
+    @if (Model.EmailSuccess != null) { <div class="alert alert-success">@Model.EmailSuccess</div> }
+    <p class="text-muted" style="margin-bottom:1rem;font-size:0.875rem">
+      Current: <strong style="color:var(--text)">@Model.Email</strong>
+    </p>
+    <form method="post" action="/Profile/ChangeEmail">
+      <div class="form-group">
+        <label>New Email Address</label>
+        <input asp-for="ChangeEmail.NewEmail" type="email" required />
+      </div>
+      <button class="btn btn-primary" type="submit">Update Email</button>
+    </form>
+  </div>
+
+  <div class="card" style="margin-bottom:1.5rem">
+    <div class="card-title">Change Password</div>
+    @if (Model.PasswordError != null) { <div class="alert alert-error">@Model.PasswordError</div> }
+    @if (Model.PasswordSuccess != null) { <div class="alert alert-success">@Model.PasswordSuccess</div> }
+    <form method="post" action="/Profile/ChangePassword">
+      <div class="form-group">
+        <label>Current Password</label>
+        <div class="pw-wrap">
+          <input asp-for="ChangePassword.CurrentPassword" type="password" required />
+          <button type="button" class="pw-toggle"></button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>New Password</label>
+        <div class="pw-wrap">
+          <input asp-for="ChangePassword.NewPassword" type="password" required />
+          <button type="button" class="pw-toggle"></button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Confirm New Password</label>
+        <div class="pw-wrap">
+          <input asp-for="ChangePassword.ConfirmPassword" type="password" required />
+          <button type="button" class="pw-toggle"></button>
+        </div>
+      </div>
+      <button class="btn btn-primary" type="submit">Update Password</button>
+    </form>
+  </div>
+
+</div>

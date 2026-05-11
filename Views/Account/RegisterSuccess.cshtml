@@ -1,0 +1,19 @@
+@model string
+@{ ViewData["Title"] = "Registration"; Layout = "_Layout"; }
+<div class="page-center">
+  <div style="width:100%;max-width:440px">
+    <div class="card">
+      @if (Model == "first_admin")
+      {
+        <div class="alert alert-success">Admin account created. <a href="/Account/Login">Log in now</a></div>
+      }
+      else
+      {
+        <div class="alert alert-info">
+          Registration submitted. An admin will review your account and you will receive a confirmation email once approved.
+        </div>
+        <p class="text-center mt2"><a href="/Account/Login">Back to login</a></p>
+      }
+    </div>
+  </div>
+</div>

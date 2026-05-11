@@ -1,0 +1,77 @@
+@model List<ScalpingApp.Models.User>
+@{ ViewData["Title"] = "User Management"; Layout = "_Layout"; }
+@await Html.PartialAsync("_Topbar")
+
+<div style="padding:2rem">
+  <h2 style="font-size:1.1rem;font-weight:600;color:var(--accent);margin-bottom:1.5rem">User Management</h2>
+  <div class="card" style="overflow-x:auto;padding:0">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr>
+          @foreach (var h in new[]{"Username","Email","Status","Role","Actions"})
+          {
+            <th style="text-align:left;padding:0.75rem 1rem;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);border-bottom:1px solid var(--border)">@h</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var u in Model)
+        {
+          var isSelf   = u.Id.ToString() == User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+          var statusBg = u.IsSuspended ? "rgba(239,68,68,0.15)" : (!u.IsApproved || !u.IsVerified ? "rgba(245,158,11,0.15)" : "rgba(16,185,129,0.15)");
+          var statusFg = u.IsSuspended ? "var(--danger)" : (!u.IsApproved || !u.IsVerified ? "var(--warn)" : "var(--success)");
+          var statusTx = u.IsSuspended ? "Suspended" : (!u.IsApproved || !u.IsVerified ? "Pending" : "Active");
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:0.75rem 1rem;font-weight:500">
+              @u.Username @if (isSelf){ <span class="text-muted" style="font-size:0.75rem">(you)</span> }
+            </td>
+            <td style="padding:0.75rem 1rem;color:var(--muted);font-size:0.875rem">@u.Email</td>
+            <td style="padding:0.75rem 1rem">
+              <span style="background:@statusBg;color:@statusFg;padding:0.2rem 0.6rem;border-radius:999px;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.4px">@statusTx</span>
+            </td>
+            <td style="padding:0.75rem 1rem">
+              @if (isSelf)
+              {
+                <span style="background:var(--border);color:var(--text);padding:0.2rem 0.6rem;border-radius:999px;font-size:0.7rem;font-weight:600;text-transform:uppercase">@u.Role</span>
+              }
+              else
+              {
+                <form method="post" action="/Admin/ChangeRole">
+                  <input type="hidden" name="uid" value="@u.Id" />
+                  <select name="role" onchange="this.form.submit()">
+                    @foreach (var r in Enum.GetValues<ScalpingApp.Models.UserRole>())
+                    {
+                      <option value="@r" selected="@(u.Role == r)">@r</option>
+                    }
+                  </select>
+                </form>
+              }
+            </td>
+            <td style="padding:0.75rem 1rem">
+              @if (!isSelf)
+              {
+                <div class="flex gap1">
+                  <form method="post" action="/Admin/Suspend" style="display:inline">
+                    <input type="hidden" name="uid" value="@u.Id" />
+                    <button class="btn btn-warn btn-sm" type="submit">@(u.IsSuspended ? "Unsuspend" : "Suspend")</button>
+                  </form>
+                  <form method="post" action="/Admin/ResetPassword" style="display:inline"
+                        onsubmit="return confirm('Reset password for @u.Username? Their account will be suspended until they set a new password.')">
+                    <input type="hidden" name="uid" value="@u.Id" />
+                    <button class="btn btn-ghost btn-sm" type="submit">Reset Password</button>
+                  </form>
+                  <form method="post" action="/Admin/Delete" style="display:inline"
+                        onsubmit="return confirm('Delete @u.Username? This cannot be undone.')">
+                    <input type="hidden" name="uid" value="@u.Id" />
+                    <button class="btn btn-danger btn-sm" type="submit">Delete</button>
+                  </form>
+                </div>
+              }
+              else { <span class="text-muted" style="font-size:0.8rem">—</span> }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>

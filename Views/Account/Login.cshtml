@@ -1,0 +1,40 @@
+@model ScalpingApp.ViewModels.LoginViewModel
+@{ ViewData["Title"] = "Login"; Layout = "_Layout"; }
+<div class="page-center">
+  <div style="width:100%;max-width:400px">
+    <div class="text-center" style="margin-bottom:2rem">
+      <h1 style="font-size:1.4rem;font-weight:700;color:var(--accent);letter-spacing:-0.3px">Scalping</h1>
+      <p class="text-muted" style="margin-top:0.25rem">Adaptive Realtime Trading</p>
+    </div>
+    <div class="card">
+      @if (Model.Error == "suspended")      { <div class="alert alert-error">Your account has been suspended.</div> }
+      @if (Model.Error == "pending_approval"){ <div class="alert alert-info">Your account is awaiting admin approval.</div> }
+      @if (Model.Error == "pending_verification"){ <div class="alert alert-info">Please verify your email before logging in.</div> }
+
+      <form method="post">
+        <div class="form-group">
+          <label>Username</label>
+          <input asp-for="Username" type="text" autocomplete="username" required />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <div class="pw-wrap">
+            <input asp-for="Password" type="password" autocomplete="current-password" required />
+            <button type="button" class="pw-toggle"></button>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-full mt2" type="submit">Log In</button>
+        <p class="text-center mt2" style="font-size:0.875rem;color:var(--muted)">
+          @if (Model.Error == "invalid")
+          {
+            <span>Forgotten <a href="/Account/ForgotUsername">username</a> or <a href="/Account/ForgotPassword">password</a></span>
+          }
+          else
+          {
+            <a href="/Account/Register">New user registration</a>
+          }
+        </p>
+      </form>
+    </div>
+  </div>
+</div>
