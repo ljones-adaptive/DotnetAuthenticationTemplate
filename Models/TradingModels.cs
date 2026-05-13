@@ -47,4 +47,15 @@ public class TradingData
     public string            Symbol       { get; set; } = "";
     public string            Date         { get; set; } = "";
     public string?           Error        { get; set; }
+    public TradingStats      Stats        { get; set; } = new();
+}
+
+public class TradingStats
+{
+    public int     Candles15mCount  { get; set; }
+    public int     Candles1hCount   { get; set; }
+    public int     MagicLinesFound  { get; set; }
+    public int     SignalsDetected  { get; set; }
+    public decimal DayHigh          { get; set; }
+    public decimal DayLow           { get; set; }
 }

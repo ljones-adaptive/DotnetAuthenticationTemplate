@@ -22,7 +22,10 @@ public class StrategyService : IStrategyService
     private const int SuckerMax = 6;
 
     // How close (% of price) the sucker-move must reach the zone
-    private const decimal ZoneReach = 0.006m;      // 0.6 %
+    private const decimal ZoneReach = 0.010m;      // 1.0 % (generous — ES can move fast)
+
+    // Magic lines must sit within this % of the day's mid-price to be considered relevant
+    private const decimal RelevanceBuffer = 0.04m; // ±4 %
 
     public TradingData ApplyStrategy(
         List<Candle> candles1h,
@@ -31,8 +34,26 @@ public class StrategyService : IStrategyService
         string date,
         bool isLive)
     {
-        var magicLines = DetectMagicLines(candles1h);
-        var signals    = DetectSignals(candles15m, magicLines);
+        var allLevels  = DetectMagicLines(candles1h);
+
+        // ── Filter to levels that are within ±4% of today's actual trading price ──
+        // This removes stale historical zones that are far from the current day.
+        List<SwingLevel> magicLines;
+        if (candles15m.Any())
+        {
+            var midPrice   = candles15m.Average(c => (c.High + c.Low) / 2m);
+            var lowerBound = midPrice * (1m - RelevanceBuffer);
+            var upperBound = midPrice * (1m + RelevanceBuffer);
+            magicLines = allLevels
+                .Where(l => l.Price >= lowerBound && l.Price <= upperBound)
+                .ToList();
+        }
+        else
+        {
+            magicLines = allLevels;
+        }
+
+        var signals = DetectSignals(candles15m, magicLines);
 
         return new TradingData
         {

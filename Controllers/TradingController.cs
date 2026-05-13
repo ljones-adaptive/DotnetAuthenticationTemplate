@@ -55,8 +55,8 @@ public class TradingController : Controller
                 nowEt.TimeOfDay <  new TimeSpan(16, 0, 0);
 
             // ── Fetch data ──────────────────────────────────────────────────
-            // 1H candles: 40 days lookback for swing-level detection
-            var hourlyFrom = targetDate.AddDays(-40);
+            // 1H candles: 20 trading days lookback — enough swing history, stays recent
+            var hourlyFrom = targetDate.AddDays(-20);
             var hourlyTo   = isToday ? DateTime.UtcNow : targetDate.AddDays(1);
             var candles1h  = await _market.GetCandlesAsync(symbol, "1h", hourlyFrom, hourlyTo);
 
@@ -79,6 +79,15 @@ public class TradingController : Controller
                 targetDate.ToString("yyyy-MM-dd"), marketOpen);
 
             result.MarketStatus = marketOpen ? "open" : "closed";
+            result.Stats = new ScalpingApp.Models.TradingStats
+            {
+                Candles15mCount = candles15m.Count,
+                Candles1hCount  = candles1h.Count,
+                MagicLinesFound = result.MagicLines.Count,
+                SignalsDetected = result.Signals.Count,
+                DayHigh         = candles15m.Any() ? candles15m.Max(c => c.High) : 0,
+                DayLow          = candles15m.Any() ? candles15m.Min(c => c.Low)  : 0,
+            };
 
             var options = new JsonSerializerOptions
             {

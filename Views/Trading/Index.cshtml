@@ -46,7 +46,18 @@
     </div>
   </div>
 
-  @* ── Chart card ──────────────────────────────────────────────────────── *@
+  @* ── Stats bar (populated after load) ───────────────────────────────── *@
+  <div id="statsBar" style="display:none;margin-bottom:1rem">
+    <div class="card" style="padding:0.6rem 1.25rem;display:flex;gap:2rem;flex-wrap:wrap;font-size:0.78rem;color:var(--muted)">
+      <span>15M candles: <strong id="st15m" style="color:var(--text)">—</strong></span>
+      <span>1H candles: <strong id="st1h"  style="color:var(--text)">—</strong></span>
+      <span>Day range: <strong id="stRange" style="color:var(--text)">—</strong></span>
+      <span>Magic lines: <strong id="stLines" style="color:var(--accent)">—</strong></span>
+      <span>Signals: <strong id="stSigs" style="color:var(--accent)">—</strong></span>
+    </div>
+  </div>
+
+@* ── Chart card ──────────────────────────────────────────────────────── *@
   <div class="card" style="padding:0;position:relative;overflow:hidden">
 
     @* loading / error overlays *@
@@ -141,6 +152,7 @@ async function fetchAndRender(sym, date) {
     if (data.error) { showError(data.error); return; }
 
     hideOverlays();
+    renderStats(data);
     renderChart(data);
     renderSignalsTable(data.signals || []);
 
@@ -153,6 +165,22 @@ async function fetchAndRender(sym, date) {
   } catch (e) {
     showError('Network error: ' + e.message);
   }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Stats bar
+─────────────────────────────────────────────────────────────────────────── */
+function renderStats(data) {
+  const s = data.stats || {};
+  document.getElementById('st15m').textContent   = s.candles15mCount ?? '—';
+  document.getElementById('st1h').textContent    = s.candles1hCount  ?? '—';
+  document.getElementById('stLines').textContent = s.magicLinesFound ?? '—';
+  document.getElementById('stSigs').textContent  = s.signalsDetected ?? '—';
+  document.getElementById('stRange').textContent =
+    (s.dayLow && s.dayHigh)
+      ? `${s.dayLow.toFixed(2)} – ${s.dayHigh.toFixed(2)}`
+      : '—';
+  document.getElementById('statsBar').style.display = 'block';
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -354,6 +382,7 @@ function showLoading(msg) {
   document.getElementById('errorOverlay').style.display   = 'none';
   document.getElementById('signalsSection').style.display = 'none';
   document.getElementById('statusBadge').style.display    = 'none';
+  document.getElementById('statsBar').style.display       = 'none';
 }
 
 function hideOverlays() {
