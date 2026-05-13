@@ -1,0 +1,388 @@
+@{ ViewData["Title"] = "Day Trade — Option 1"; Layout = "_Layout"; }
+@await Html.PartialAsync("_Topbar")
+
+<div style="padding:1.25rem 1.5rem">
+
+  @* ── Controls ─────────────────────────────────────────────────────── *@
+  <div class="card" style="margin-bottom:1rem;padding:1rem 1.25rem">
+    <div style="display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap">
+
+      <div>
+        <label class="ctrl-label">Market</label>
+        <select id="symbol" class="ctrl-select">
+          <option value="ES=F">ES  —  S&amp;P 500 Futures</option>
+          <option value="NQ=F">NQ  —  Nasdaq Futures</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="ctrl-label">Date</label>
+        <input type="date" id="dateInput" class="ctrl-select" />
+      </div>
+
+      <button onclick="loadSelected()" class="btn btn-primary" style="padding:0.45rem 1.25rem">
+        Load
+      </button>
+      <button onclick="loadToday()" class="btn btn-ghost" style="padding:0.45rem 1rem">
+        Today (Live)
+      </button>
+
+      <div id="statusBadge" style="display:none;margin-left:auto;align-self:center">
+        <span id="statusText" style="padding:0.25rem 0.85rem;border-radius:999px;font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.4px"></span>
+      </div>
+    </div>
+  </div>
+
+  @* ── Legend ──────────────────────────────────────────────────────────── *@
+  <div class="card" style="margin-bottom:1rem;padding:0.65rem 1.25rem">
+    <div style="display:flex;gap:1.5rem;flex-wrap:wrap;font-size:0.78rem;color:var(--muted);align-items:center">
+      <span><span class="leg" style="background:#f59e0b;height:2px;width:18px;display:inline-block;vertical-align:middle;margin-right:5px"></span>Resistance (magic line)</span>
+      <span><span class="leg" style="background:#3b82f6;height:2px;width:18px;display:inline-block;vertical-align:middle;margin-right:5px"></span>Support (magic line)</span>
+      <span><span class="leg sq" style="background:rgba(239,68,68,0.75)"></span>Sucker move</span>
+      <span><span class="leg sq" style="background:#a855f7"></span>Pitchfork</span>
+      <span><span class="leg sq" style="background:#00d4ff;border-radius:50%"></span>Entry</span>
+      <span><span class="leg sq" style="background:#10b981;border-radius:50%"></span>Target hit</span>
+      <span><span class="leg sq" style="background:#ef4444;border-radius:50%"></span>Stop hit</span>
+    </div>
+  </div>
+
+  @* ── Chart card ──────────────────────────────────────────────────────── *@
+  <div class="card" style="padding:0;position:relative;overflow:hidden">
+
+    @* loading / error overlays *@
+    <div id="loadingOverlay"
+         style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--card);z-index:20;gap:0.75rem">
+      <div style="font-size:2.5rem">📈</div>
+      <div style="color:var(--muted);font-size:0.9rem" id="loadingMsg">Select a market and date, then press Load</div>
+      <div id="spinner" style="display:none;width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite"></div>
+    </div>
+
+    <div id="errorOverlay"
+         style="position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:var(--card);z-index:20;gap:0.5rem">
+      <div style="font-size:2rem">⚠️</div>
+      <div id="errorMsg" style="color:var(--danger);text-align:center;max-width:420px;font-size:0.875rem;padding:0 1rem"></div>
+    </div>
+
+    <div id="chart" style="width:100%;height:560px"></div>
+  </div>
+
+  @* ── Signals table ───────────────────────────────────────────────────── *@
+  <div id="signalsSection" style="display:none;margin-top:1rem">
+    <div class="card" style="padding:0;overflow-x:auto">
+      <div style="padding:0.75rem 1.25rem;border-bottom:1px solid var(--border);font-size:0.85rem;font-weight:600;color:var(--accent)">
+        Detected Signals
+        <span id="signalCount" style="font-weight:400;color:var(--muted);font-size:0.78rem;margin-left:0.5rem"></span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:0.85rem">
+        <thead>
+          <tr>
+            @foreach (var h in new[]{"Time (UTC)","Direction","Entry","Stop","Target","R:R","Outcome"})
+            {
+              <th style="text-align:left;padding:0.6rem 1rem;font-size:0.72rem;text-transform:uppercase;
+                         letter-spacing:0.5px;color:var(--muted);border-bottom:1px solid var(--border)">@h</th>
+            }
+          </tr>
+        </thead>
+        <tbody id="signalsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+@* ── CSS extras ──────────────────────────────────────────────────────── *@
+<style>
+  .ctrl-label { display:block; font-size:0.72rem; color:var(--muted); text-transform:uppercase;
+                letter-spacing:0.5px; margin-bottom:0.3rem; }
+  .ctrl-select { background:var(--card); border:1px solid var(--border); color:var(--text);
+                 padding:0.4rem 0.75rem; border-radius:6px; font-size:0.875rem; }
+  .leg.sq { display:inline-block; width:10px; height:10px; vertical-align:middle; margin-right:5px; border-radius:2px; }
+  @@keyframes spin { to { transform:rotate(360deg); } }
+</style>
+
+@* ── Lightweight Charts (TradingView, MIT) ───────────────────────────── *@
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+
+<script>
+/* ───────────────────────────────────────────────────────────────────────────
+   State
+─────────────────────────────────────────────────────────────────────────── */
+let chart        = null;
+let candleSeries = null;
+let liveTimer    = null;
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Entry points
+─────────────────────────────────────────────────────────────────────────── */
+async function loadSelected() {
+  const sym  = document.getElementById('symbol').value;
+  const date = document.getElementById('dateInput').value || 'today';
+  stopLive();
+  await fetchAndRender(sym, date);
+}
+
+async function loadToday() {
+  document.getElementById('dateInput').value = '';
+  const sym = document.getElementById('symbol').value;
+  stopLive();
+  await fetchAndRender(sym, 'today');
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Fetch + render cycle
+─────────────────────────────────────────────────────────────────────────── */
+async function fetchAndRender(sym, date) {
+  showLoading('Loading market data…');
+
+  try {
+    const res  = await fetch(`/Trading/Data?symbol=${encodeURIComponent(sym)}&date=${encodeURIComponent(date)}`);
+    const data = await res.json();
+
+    if (data.error) { showError(data.error); return; }
+
+    hideOverlays();
+    renderChart(data);
+    renderSignalsTable(data.signals || []);
+
+    if (data.isLive) {
+      setStatus('live', '🟢 Live — updates every 60 s');
+      liveTimer = setInterval(() => fetchAndRender(sym, 'today'), 60_000);
+    } else {
+      setStatus('hist', '📅 Historical');
+    }
+  } catch (e) {
+    showError('Network error: ' + e.message);
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Chart rendering
+─────────────────────────────────────────────────────────────────────────── */
+function renderChart(data) {
+  /* re-create chart on every load so price lines / markers are reset */
+  if (chart) { chart.remove(); chart = null; }
+
+  const el = document.getElementById('chart');
+
+  chart = LightweightCharts.createChart(el, {
+    layout : { background: { color: '#0f1629' }, textColor: '#94a3b8' },
+    grid   : { vertLines: { color: '#1a2744' }, horzLines: { color: '#1a2744' } },
+    crosshair : { mode: LightweightCharts.CrosshairMode.Normal },
+    rightPriceScale : { borderColor: '#1a2744' },
+    timeScale : { borderColor: '#1a2744', timeVisible: true, secondsVisible: false },
+    width  : el.offsetWidth,
+    height : 560,
+  });
+
+  window.addEventListener('resize', () => {
+    if (chart) chart.applyOptions({ width: el.offsetWidth });
+  });
+
+  /* ── Candlestick series ── */
+  candleSeries = chart.addCandlestickSeries({
+    upColor        : '#10b981', downColor        : '#ef4444',
+    borderUpColor  : '#10b981', borderDownColor  : '#ef4444',
+    wickUpColor    : '#10b981', wickDownColor    : '#ef4444',
+  });
+
+  const cdata = (data.candles15m || []).map(c => ({
+    time: c.time, open: c.open, high: c.high, low: c.low, close: c.close
+  }));
+  candleSeries.setData(cdata);
+
+  /* ── Magic lines (horizontal price lines) ── */
+  (data.magicLines || []).forEach(ml => {
+    const isRes = ml.type === 'resistance';
+    candleSeries.createPriceLine({
+      price            : ml.price,
+      color            : isRes ? '#f59e0b' : '#3b82f6',
+      lineWidth        : 2,
+      lineStyle        : LightweightCharts.LineStyle.Dashed,
+      axisLabelVisible : true,
+      title            : `${isRes ? '▲ R' : '▼ S'} (${ml.touchCount}×)`,
+    });
+  });
+
+  /* ── Per-signal entry / stop / target price lines ── */
+  (data.signals || []).forEach((sig, idx) => {
+    const label = `#${idx + 1} `;
+    candleSeries.createPriceLine({
+      price: sig.entry, color: '#00d4ff', lineWidth: 1,
+      lineStyle: LightweightCharts.LineStyle.Dotted,
+      axisLabelVisible: true,
+      title: label + (sig.direction === 'long' ? '↑ Entry' : '↓ Entry'),
+    });
+    candleSeries.createPriceLine({
+      price: sig.stopLoss, color: '#ef4444', lineWidth: 1,
+      lineStyle: LightweightCharts.LineStyle.Dotted,
+      axisLabelVisible: false, title: label + 'Stop',
+    });
+    /* only draw target line if outcome is pending or target was hit */
+    if (sig.outcome !== 'stop') {
+      candleSeries.createPriceLine({
+        price: sig.target, color: '#10b981', lineWidth: 1,
+        lineStyle: LightweightCharts.LineStyle.Dotted,
+        axisLabelVisible: false, title: label + 'Target',
+      });
+    }
+  });
+
+  /* ── Candle markers ── */
+  const markers = [];
+  (data.signals || []).forEach(sig => {
+    (sig.phases || []).forEach(ph => {
+      switch (ph.type) {
+        case 'sucker_move':
+          markers.push({
+            time     : ph.time,
+            position : sig.direction === 'long' ? 'belowBar' : 'aboveBar',
+            color    : 'rgba(239,68,68,0.7)',
+            shape    : 'square',
+            text     : '',
+          });
+          break;
+
+        case 'pitchfork':
+          markers.push({
+            time     : ph.time,
+            position : sig.direction === 'long' ? 'belowBar' : 'aboveBar',
+            color    : '#a855f7',
+            shape    : 'square',
+            text     : '⑂ Fork',
+          });
+          break;
+
+        case 'entry':
+          markers.push({
+            time     : ph.time,
+            position : sig.direction === 'long' ? 'belowBar' : 'aboveBar',
+            color    : '#00d4ff',
+            shape    : sig.direction === 'long' ? 'arrowUp' : 'arrowDown',
+            text     : sig.direction === 'long' ? 'LONG' : 'SHORT',
+          });
+          break;
+
+        case 'target':
+          markers.push({
+            time     : ph.time,
+            position : sig.direction === 'long' ? 'aboveBar' : 'belowBar',
+            color    : '#10b981',
+            shape    : sig.direction === 'long' ? 'arrowUp' : 'arrowDown',
+            text     : '✓ Target',
+          });
+          break;
+
+        case 'stop':
+          markers.push({
+            time     : ph.time,
+            position : sig.direction === 'long' ? 'belowBar' : 'aboveBar',
+            color    : '#ef4444',
+            shape    : sig.direction === 'long' ? 'arrowDown' : 'arrowUp',
+            text     : '✗ Stop',
+          });
+          break;
+      }
+    });
+  });
+
+  /* sort by time (library requirement) */
+  markers.sort((a, b) => a.time - b.time);
+  candleSeries.setMarkers(markers);
+
+  chart.timeScale().fitContent();
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Signals table
+─────────────────────────────────────────────────────────────────────────── */
+function renderSignalsTable(signals) {
+  const body    = document.getElementById('signalsBody');
+  const section = document.getElementById('signalsSection');
+  const count   = document.getElementById('signalCount');
+
+  body.innerHTML = '';
+
+  if (!signals.length) { section.style.display = 'none'; return; }
+
+  count.textContent = `— ${signals.length} signal${signals.length !== 1 ? 's' : ''} detected`;
+
+  signals.forEach((sig, idx) => {
+    const rr = (sig.stopLoss && sig.entry)
+      ? (Math.abs(sig.target - sig.entry) /
+         Math.abs(sig.entry  - sig.stopLoss)).toFixed(1) + 'R'
+      : '—';
+
+    const outcomeStyle =
+      sig.outcome === 'target' ? 'color:#10b981;font-weight:600' :
+      sig.outcome === 'stop'   ? 'color:#ef4444;font-weight:600' :
+                                 'color:var(--muted)';
+
+    const outcomeLabel =
+      sig.outcome === 'target' ? '✓ Target Hit' :
+      sig.outcome === 'stop'   ? '✗ Stop Hit'   : '● Open';
+
+    const dirStyle =
+      sig.direction === 'long'
+        ? 'color:#10b981;font-weight:700;text-transform:uppercase'
+        : 'color:#ef4444;font-weight:700;text-transform:uppercase';
+
+    const entryTime = new Date(sig.entryTime * 1000)
+      .toISOString().slice(11, 16);
+
+    body.innerHTML += `
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:0.6rem 1rem">#${idx+1} &nbsp;${entryTime}</td>
+        <td style="padding:0.6rem 1rem"><span style="${dirStyle}">${sig.direction}</span></td>
+        <td style="padding:0.6rem 1rem">${sig.entry?.toFixed(2) ?? '—'}</td>
+        <td style="padding:0.6rem 1rem;color:#ef4444">${sig.stopLoss?.toFixed(2) ?? '—'}</td>
+        <td style="padding:0.6rem 1rem;color:#10b981">${sig.target?.toFixed(2) ?? '—'}</td>
+        <td style="padding:0.6rem 1rem">${rr}</td>
+        <td style="padding:0.6rem 1rem;font-size:0.8rem;${outcomeStyle}">${outcomeLabel}</td>
+      </tr>`;
+  });
+
+  section.style.display = 'block';
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   UI helpers
+─────────────────────────────────────────────────────────────────────────── */
+function showLoading(msg) {
+  document.getElementById('loadingMsg').textContent = msg;
+  document.getElementById('spinner').style.display  = 'block';
+  document.getElementById('loadingOverlay').style.display = 'flex';
+  document.getElementById('errorOverlay').style.display   = 'none';
+  document.getElementById('signalsSection').style.display = 'none';
+  document.getElementById('statusBadge').style.display    = 'none';
+}
+
+function hideOverlays() {
+  document.getElementById('loadingOverlay').style.display = 'none';
+  document.getElementById('errorOverlay').style.display   = 'none';
+}
+
+function showError(msg) {
+  document.getElementById('loadingOverlay').style.display  = 'none';
+  document.getElementById('errorOverlay').style.display    = 'flex';
+  document.getElementById('errorMsg').textContent          = msg;
+  document.getElementById('signalsSection').style.display  = 'none';
+  document.getElementById('statusBadge').style.display     = 'none';
+}
+
+function setStatus(type, text) {
+  const badge = document.getElementById('statusBadge');
+  const span  = document.getElementById('statusText');
+  badge.style.display    = 'block';
+  span.textContent       = text;
+  span.style.background  = type === 'live' ? 'rgba(16,185,129,0.15)' : 'rgba(148,163,184,0.1)';
+  span.style.color       = type === 'live' ? '#10b981'               : '#94a3b8';
+  span.style.border      = `1px solid ${type === 'live' ? 'rgba(16,185,129,0.3)' : 'rgba(148,163,184,0.2)'}`;
+}
+
+function stopLive() {
+  if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
+}
+
+/* ── Set today as default date ── */
+document.getElementById('dateInput').valueAsDate = new Date();
+</script>

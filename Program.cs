@@ -28,6 +28,8 @@ builder.Services.AddAuthorization(options =>
 
 builder.Services.AddSingleton<ITokenService, TokenService>();
 builder.Services.AddTransient<IEmailService, EmailService>();
+builder.Services.AddHttpClient<IMarketDataService, MarketDataService>();
+builder.Services.AddScoped<IStrategyService, StrategyService>();
 
 var app = builder.Build();
 
