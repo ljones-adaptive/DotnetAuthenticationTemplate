@@ -17,7 +17,11 @@
 
       <div>
         <label class="ctrl-label">Date</label>
-        <input type="date" id="dateInput" class="ctrl-select" />
+        <div style="display:flex;align-items:center;gap:0.35rem">
+          <button onclick="stepDate(-1)" class="day-nav-btn" title="Previous trading day">&#8249;</button>
+          <input type="date" id="dateInput" class="ctrl-select" style="width:145px" />
+          <button onclick="stepDate(+1)" class="day-nav-btn" title="Next trading day">&#8250;</button>
+        </div>
       </div>
 
       <button onclick="loadSelected()" class="btn btn-primary" style="padding:0.45rem 1.25rem">
@@ -108,6 +112,13 @@
   .ctrl-select { background:var(--card); border:1px solid var(--border); color:var(--text);
                  padding:0.4rem 0.75rem; border-radius:6px; font-size:0.875rem; }
   .leg.sq { display:inline-block; width:10px; height:10px; vertical-align:middle; margin-right:5px; border-radius:2px; }
+  .day-nav-btn {
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    width: 28px; height: 32px; border-radius: 6px; font-size: 1.3rem; line-height: 1;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .day-nav-btn:hover { background: var(--border); border-color: var(--accent); color: var(--accent); }
   @@keyframes spin { to { transform:rotate(360deg); } }
 </style>
 
@@ -410,6 +421,98 @@ function setStatus(type, text) {
 
 function stopLive() {
   if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Trading-day navigation  (weekends + US market holidays)
+─────────────────────────────────────────────────────────────────────────── */
+
+/** Returns Easter Sunday for a given year (Anonymous Gregorian algorithm). */
+function easterSunday(y) {
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100;
+  const d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31) - 1; // 0-based
+  const day   = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(y, month, day);
+}
+
+/** Returns a Set of "YYYY-MM-DD" strings for NYSE holidays in a given year. */
+function nyseHolidays(y) {
+  const holidays = new Set();
+
+  // Move a date to its observed weekday if it falls on a weekend
+  function observed(date) {
+    const dow = date.getDay();
+    if (dow === 6) return new Date(date.getFullYear(), date.getMonth(), date.getDate() - 1);
+    if (dow === 0) return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+    return date;
+  }
+
+  // nth occurrence of weekday (0=Sun…6=Sat) in a month (0-based)
+  function nthDay(year, month, weekday, n) {
+    let d = new Date(year, month, 1), count = 0;
+    while (true) {
+      if (d.getDay() === weekday && ++count === n) return d;
+      d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+    }
+  }
+
+  // Last occurrence of weekday in a month
+  function lastDay(year, month, weekday) {
+    let d = new Date(year, month + 1, 0); // last calendar day of month
+    while (d.getDay() !== weekday) d = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1);
+    return d;
+  }
+
+  function add(date) {
+    holidays.add(date.toISOString().slice(0, 10));
+  }
+
+  const easter = easterSunday(y);
+  const goodFriday = new Date(easter.getFullYear(), easter.getMonth(), easter.getDate() - 2);
+
+  add(observed(new Date(y, 0,  1)));           // New Year's Day
+  add(nthDay(y, 0, 1, 3));                     // MLK Day          — 3rd Mon Jan
+  add(nthDay(y, 1, 1, 3));                     // Presidents' Day  — 3rd Mon Feb
+  add(goodFriday);                             // Good Friday
+  add(lastDay(y, 4, 1));                       // Memorial Day     — last Mon May
+  if (y >= 2022) add(observed(new Date(y, 5, 19))); // Juneteenth
+  add(observed(new Date(y, 6,  4)));           // Independence Day
+  add(nthDay(y, 8, 1, 1));                     // Labor Day        — 1st Mon Sep
+  add(nthDay(y, 10, 4, 4));                    // Thanksgiving     — 4th Thu Nov
+  add(observed(new Date(y, 11, 25)));          // Christmas Day
+
+  return holidays;
+}
+
+/** True if `date` is a day the NYSE is open. */
+function isTradingDay(date) {
+  const dow = date.getDay();
+  if (dow === 0 || dow === 6) return false;         // weekend
+  const key = date.toISOString().slice(0, 10);
+  return !nyseHolidays(date.getFullYear()).has(key);
+}
+
+/** Step the date picker by `dir` (+1 forward, -1 back) trading days, then auto-load. */
+function stepDate(dir) {
+  const input = document.getElementById('dateInput');
+  // Parse current value; fall back to today
+  let d = input.value ? new Date(input.value + 'T12:00:00Z') : new Date();
+  do { d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + dir); }
+  while (!isTradingDay(d));
+
+  // Don't allow stepping past today
+  const today = new Date(); today.setHours(0,0,0,0);
+  if (d > today) d = today;
+
+  input.value = d.toISOString().slice(0, 10);
+  loadSelected();
 }
 
 /* ── Set today as default date ── */
